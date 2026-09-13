@@ -1,0 +1,971 @@
+[
+  {
+    "image_name": "mscoll390_item1258_2009_0002_web.jpg",
+    "width": 1800,
+    "height": 964,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9349705576896667,
+        "bbox": {
+          "x_min": 291,
+          "y_min": 227,
+          "x_max": 1573,
+          "y_max": 780
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1271_2057_0000_web.jpg",
+    "width": 1800,
+    "height": 846,
+    "detections": []
+  },
+  {
+    "image_name": "mscoll390_item1271_2057_0008_web.jpg",
+    "width": 1800,
+    "height": 1622,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9715908765792847,
+        "bbox": {
+          "x_min": 210,
+          "y_min": 88,
+          "x_max": 1609,
+          "y_max": 720
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.968765914440155,
+        "bbox": {
+          "x_min": 214,
+          "y_min": 889,
+          "x_max": 1622,
+          "y_max": 1543
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1354_5296_0006_web.jpg",
+    "width": 1661,
+    "height": 1800,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9355485439300537,
+        "bbox": {
+          "x_min": 279,
+          "y_min": 231,
+          "x_max": 1396,
+          "y_max": 736
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8924116492271423,
+        "bbox": {
+          "x_min": 282,
+          "y_min": 1075,
+          "x_max": 1388,
+          "y_max": 1564
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1354_5296_0013_web.jpg",
+    "width": 1661,
+    "height": 1800,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9534325003623962,
+        "bbox": {
+          "x_min": 271,
+          "y_min": 1086,
+          "x_max": 1385,
+          "y_max": 1614
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8750482201576233,
+        "bbox": {
+          "x_min": 287,
+          "y_min": 247,
+          "x_max": 1385,
+          "y_max": 756
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1411_2086_0003_web.jpg",
+    "width": 1289,
+    "height": 1800,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.831518828868866,
+        "bbox": {
+          "x_min": 252,
+          "y_min": 1022,
+          "x_max": 1048,
+          "y_max": 1646
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.7133976817131042,
+        "bbox": {
+          "x_min": 259,
+          "y_min": 179,
+          "x_max": 1055,
+          "y_max": 1502
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.45159029960632324,
+        "bbox": {
+          "x_min": 267,
+          "y_min": 173,
+          "x_max": 1048,
+          "y_max": 1064
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.2816891670227051,
+        "bbox": {
+          "x_min": 257,
+          "y_min": 147,
+          "x_max": 1049,
+          "y_max": 586
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1557_2119_0010_web.jpg",
+    "width": 1800,
+    "height": 1721,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8080068826675415,
+        "bbox": {
+          "x_min": 300,
+          "y_min": 1046,
+          "x_max": 1504,
+          "y_max": 1618
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.5474340319633484,
+        "bbox": {
+          "x_min": 295,
+          "y_min": 91,
+          "x_max": 1526,
+          "y_max": 660
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1564_4117_0010_web.jpg",
+    "width": 1800,
+    "height": 1457,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9572444558143616,
+        "bbox": {
+          "x_min": 223,
+          "y_min": 806,
+          "x_max": 1630,
+          "y_max": 1346
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8386690616607666,
+        "bbox": {
+          "x_min": 225,
+          "y_min": 128,
+          "x_max": 1621,
+          "y_max": 677
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.3364614248275757,
+        "bbox": {
+          "x_min": 217,
+          "y_min": 788,
+          "x_max": 1638,
+          "y_max": 1178
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.3264584541320801,
+        "bbox": {
+          "x_min": 230,
+          "y_min": 1123,
+          "x_max": 1604,
+          "y_max": 1355
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.289082407951355,
+        "bbox": {
+          "x_min": 207,
+          "y_min": 110,
+          "x_max": 1614,
+          "y_max": 475
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1564_4117_0012_web.jpg",
+    "width": 1800,
+    "height": 1457,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9214624166488647,
+        "bbox": {
+          "x_min": 214,
+          "y_min": 804,
+          "x_max": 1644,
+          "y_max": 1355
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9043968319892883,
+        "bbox": {
+          "x_min": 227,
+          "y_min": 199,
+          "x_max": 1633,
+          "y_max": 678
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1564_4117_0023_web.jpg",
+    "width": 1800,
+    "height": 1457,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8571330904960632,
+        "bbox": {
+          "x_min": 209,
+          "y_min": 824,
+          "x_max": 1626,
+          "y_max": 1349
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.7506769299507141,
+        "bbox": {
+          "x_min": 210,
+          "y_min": 154,
+          "x_max": 1639,
+          "y_max": 678
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.4530530571937561,
+        "bbox": {
+          "x_min": 203,
+          "y_min": 354,
+          "x_max": 1610,
+          "y_max": 670
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1564_4117_0035_web.jpg",
+    "width": 1800,
+    "height": 1457,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9569761753082275,
+        "bbox": {
+          "x_min": 223,
+          "y_min": 780,
+          "x_max": 1600,
+          "y_max": 1342
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8631773591041565,
+        "bbox": {
+          "x_min": 219,
+          "y_min": 123,
+          "x_max": 1614,
+          "y_max": 653
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1564_4117_0046_web.jpg",
+    "width": 1800,
+    "height": 1457,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8918375372886658,
+        "bbox": {
+          "x_min": 219,
+          "y_min": 133,
+          "x_max": 1644,
+          "y_max": 667
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.882448673248291,
+        "bbox": {
+          "x_min": 225,
+          "y_min": 803,
+          "x_max": 1657,
+          "y_max": 1380
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1564_4117_0048_web.jpg",
+    "width": 1800,
+    "height": 1457,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8919764757156372,
+        "bbox": {
+          "x_min": 216,
+          "y_min": 178,
+          "x_max": 1647,
+          "y_max": 679
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1564_4117_0058_web.jpg",
+    "width": 1800,
+    "height": 1457,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8984630703926086,
+        "bbox": {
+          "x_min": 217,
+          "y_min": 818,
+          "x_max": 1645,
+          "y_max": 1374
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8783971667289734,
+        "bbox": {
+          "x_min": 222,
+          "y_min": 101,
+          "x_max": 1633,
+          "y_max": 678
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.6395637392997742,
+        "bbox": {
+          "x_min": 218,
+          "y_min": 265,
+          "x_max": 1604,
+          "y_max": 694
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.3846927881240845,
+        "bbox": {
+          "x_min": 216,
+          "y_min": 99,
+          "x_max": 1638,
+          "y_max": 406
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.26500242948532104,
+        "bbox": {
+          "x_min": 214,
+          "y_min": 411,
+          "x_max": 1598,
+          "y_max": 687
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item15_6357_0009_web.jpg",
+    "width": 1644,
+    "height": 1800,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9966968297958374,
+        "bbox": {
+          "x_min": 271,
+          "y_min": 105,
+          "x_max": 1366,
+          "y_max": 858
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9964579939842224,
+        "bbox": {
+          "x_min": 274,
+          "y_min": 926,
+          "x_max": 1364,
+          "y_max": 1672
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1603_2204_0010_web.jpg",
+    "width": 1800,
+    "height": 1675,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9930835962295532,
+        "bbox": {
+          "x_min": 285,
+          "y_min": 883,
+          "x_max": 1606,
+          "y_max": 1600
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9653832316398621,
+        "bbox": {
+          "x_min": 276,
+          "y_min": 73,
+          "x_max": 1604,
+          "y_max": 768
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.33702442049980164,
+        "bbox": {
+          "x_min": 293,
+          "y_min": 1159,
+          "x_max": 1606,
+          "y_max": 1598
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.2617292106151581,
+        "bbox": {
+          "x_min": 273,
+          "y_min": 898,
+          "x_max": 1625,
+          "y_max": 1367
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1603_2204_0027_web.jpg",
+    "width": 1800,
+    "height": 1675,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9885110855102539,
+        "bbox": {
+          "x_min": 272,
+          "y_min": 895,
+          "x_max": 1528,
+          "y_max": 1617
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9878607392311096,
+        "bbox": {
+          "x_min": 245,
+          "y_min": 81,
+          "x_max": 1585,
+          "y_max": 797
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.3533523678779602,
+        "bbox": {
+          "x_min": 260,
+          "y_min": 363,
+          "x_max": 1589,
+          "y_max": 791
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.29872405529022217,
+        "bbox": {
+          "x_min": 279,
+          "y_min": 1151,
+          "x_max": 1556,
+          "y_max": 1615
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1603_2204_0038_web.jpg",
+    "width": 1800,
+    "height": 1675,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9917858242988586,
+        "bbox": {
+          "x_min": 252,
+          "y_min": 891,
+          "x_max": 1533,
+          "y_max": 1615
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9871056079864502,
+        "bbox": {
+          "x_min": 253,
+          "y_min": 82,
+          "x_max": 1568,
+          "y_max": 790
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.3807048797607422,
+        "bbox": {
+          "x_min": 262,
+          "y_min": 494,
+          "x_max": 1578,
+          "y_max": 787
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.30081698298454285,
+        "bbox": {
+          "x_min": 267,
+          "y_min": 1156,
+          "x_max": 1575,
+          "y_max": 1608
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1603_2204_0040_web.jpg",
+    "width": 1800,
+    "height": 1675,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9922768473625183,
+        "bbox": {
+          "x_min": 262,
+          "y_min": 890,
+          "x_max": 1527,
+          "y_max": 1604
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9802815914154053,
+        "bbox": {
+          "x_min": 251,
+          "y_min": 83,
+          "x_max": 1522,
+          "y_max": 790
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.3544047176837921,
+        "bbox": {
+          "x_min": 268,
+          "y_min": 1327,
+          "x_max": 1546,
+          "y_max": 1596
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.27555587887763977,
+        "bbox": {
+          "x_min": 261,
+          "y_min": 553,
+          "x_max": 1545,
+          "y_max": 772
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1603_2204_0043_web.jpg",
+    "width": 1800,
+    "height": 1675,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9911099672317505,
+        "bbox": {
+          "x_min": 255,
+          "y_min": 895,
+          "x_max": 1509,
+          "y_max": 1620
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9894653558731079,
+        "bbox": {
+          "x_min": 270,
+          "y_min": 87,
+          "x_max": 1534,
+          "y_max": 808
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.4759121239185333,
+        "bbox": {
+          "x_min": 264,
+          "y_min": 1123,
+          "x_max": 1537,
+          "y_max": 1609
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item1603_2204_0050_web.jpg",
+    "width": 1800,
+    "height": 1675,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9942010045051575,
+        "bbox": {
+          "x_min": 272,
+          "y_min": 890,
+          "x_max": 1519,
+          "y_max": 1618
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9665127992630005,
+        "bbox": {
+          "x_min": 261,
+          "y_min": 85,
+          "x_max": 1560,
+          "y_max": 767
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.3945002853870392,
+        "bbox": {
+          "x_min": 278,
+          "y_min": 1196,
+          "x_max": 1544,
+          "y_max": 1599
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item461_3537_0002_web.jpg",
+    "width": 1484,
+    "height": 1800,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9347894787788391,
+        "bbox": {
+          "x_min": 190,
+          "y_min": 990,
+          "x_max": 1307,
+          "y_max": 1677
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.7743555307388306,
+        "bbox": {
+          "x_min": 223,
+          "y_min": 108,
+          "x_max": 1304,
+          "y_max": 817
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item461_3537_0017_web.jpg",
+    "width": 1484,
+    "height": 1800,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9600366353988647,
+        "bbox": {
+          "x_min": 267,
+          "y_min": 988,
+          "x_max": 1295,
+          "y_max": 1675
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8944876194000244,
+        "bbox": {
+          "x_min": 265,
+          "y_min": 130,
+          "x_max": 1322,
+          "y_max": 830
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item496_3594_0014_web.jpg",
+    "width": 1800,
+    "height": 1666,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9777504205703735,
+        "bbox": {
+          "x_min": 254,
+          "y_min": 133,
+          "x_max": 1588,
+          "y_max": 753
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9711487293243408,
+        "bbox": {
+          "x_min": 286,
+          "y_min": 923,
+          "x_max": 1571,
+          "y_max": 1566
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.37376508116722107,
+        "bbox": {
+          "x_min": 261,
+          "y_min": 537,
+          "x_max": 1588,
+          "y_max": 766
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item496_3594_0016_web.jpg",
+    "width": 1800,
+    "height": 1666,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9830484390258789,
+        "bbox": {
+          "x_min": 286,
+          "y_min": 918,
+          "x_max": 1524,
+          "y_max": 1565
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.9753417372703552,
+        "bbox": {
+          "x_min": 278,
+          "y_min": 131,
+          "x_max": 1535,
+          "y_max": 742
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.2591404616832733,
+        "bbox": {
+          "x_min": 282,
+          "y_min": 907,
+          "x_max": 1525,
+          "y_max": 1192
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item529_5770_0006_web.jpg",
+    "width": 1800,
+    "height": 1532,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.7465430498123169,
+        "bbox": {
+          "x_min": 364,
+          "y_min": 911,
+          "x_max": 1447,
+          "y_max": 1340
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.5261884331703186,
+        "bbox": {
+          "x_min": 330,
+          "y_min": 190,
+          "x_max": 1523,
+          "y_max": 673
+        }
+      }
+    ]
+  },
+  {
+    "image_name": "mscoll390_item529_5770_0017_web.jpg",
+    "width": 1800,
+    "height": 1532,
+    "detections": [
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.8702239394187927,
+        "bbox": {
+          "x_min": 337,
+          "y_min": 189,
+          "x_max": 1547,
+          "y_max": 647
+        }
+      },
+      {
+        "class_id": 2,
+        "class_name": "main_text",
+        "confidence": 0.7779909372329712,
+        "bbox": {
+          "x_min": 347,
+          "y_min": 915,
+          "x_max": 1538,
+          "y_max": 1329
+        }
+      }
+    ]
+  }
+]

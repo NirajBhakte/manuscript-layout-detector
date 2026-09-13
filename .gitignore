@@ -216,3 +216,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Manuscript dataset
+data/raw/
+data/dataset/images/
+data/dataset/labels/
+data/dataset/*.cache
+
+# Generated previews
+data/dataset/auto_annotated_previews/
+data/dataset/auto_contacted_previews/
+
+# Training artifacts
+models/runs/
+runs/
+
+data/test_images/

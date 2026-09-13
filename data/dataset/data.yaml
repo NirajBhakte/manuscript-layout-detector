@@ -1,0 +1,12 @@
+path: data/dataset
+train: images/train
+val: images/val
+test: images/test
+
+nc: 5
+names:
+  0: header
+  1: footer
+  2: main_text
+  3: side_text
+  4: filler

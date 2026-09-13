@@ -1,0 +1,8 @@
+{
+  "best_model": "C:\\Users\\Niraj\\manuscript-layout-detector\\models\\best.pt",
+  "epochs_completed": 11,
+  "precision": 0.9169967331077209,
+  "recall": 0.14112903225806453,
+  "mAP50": 0.1385779763039352,
+  "mAP50-95": 0.10126660857050011
+}
