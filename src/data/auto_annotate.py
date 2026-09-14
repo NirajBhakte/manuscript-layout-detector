@@ -1,482 +1,485 @@
+"""Evidence-based pseudo-annotation for manuscript layout images.
+
+The labels produced here are deliberately conservative.  They describe visibly
+separate layout regions, rather than trying to make every dark mark on a page an
+object.  In particular, a top/bottom band is *not* a header/footer on its own:
+there must be a compact ink region in that margin and a visible gap to a body
+text block.
+
+Class mapping (kept stable for the YOLO dataset):
+    0 header, 1 footer, 2 main_text, 3 side_text, 4 filler.
 """
-Manuscript Layout Auto-Annotation Utility.
 
-Generates initial YOLO object detection annotations for manuscript images by combining
-document image analysis (adaptive binarization, projection profile gap splitting,
-morphological component analysis, tight ink trimming) with conservative layout classification.
-
-Target Classes (0-4):
-- 0: header     (Top-margin titles, running headers, top folio numbers)
-- 1: footer     (Bottom-margin catchwords, quire signatures, page numbers)
-- 2: main_text  (Primary manuscript body text blocks / columns / panels)
-- 3: side_text  (Marginalia, glosses, side commentary in outer margins)
-- 4: filler     (Isolated decorative ornaments, English/pencil annotations)
-
-Features:
-- Projection profile gap detection to split multi-column pages and two-page spreads into separate text blocks.
-- Strict 80% area safety rule: rejects any box covering >80% of the image area to eliminate giant full-page boxes.
-- Tight ink boundary trimming to exclude blank parchment background margins.
-- Exports normalized YOLO format .txt label files into destination directory.
-- Renders color-coded annotated preview images in preview directory.
-"""
+from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
-from typing import Dict, List, Tuple, Any
 from collections import Counter
+from pathlib import Path
+from typing import Iterable, List, MutableMapping, Optional, Tuple
+
 import cv2
 import numpy as np
 
-CLASS_NAMES = {
-    0: "header",
-    1: "footer",
-    2: "main_text",
-    3: "side_text",
-    4: "filler",
-}
 
-CLASS_COLORS = {
-    0: (255, 255, 0),    # Cyan / Yellow-Cyan for Header
-    1: (255, 0, 255),    # Magenta for Footer
-    2: (0, 255, 0),      # Green for Main Text
-    3: (0, 165, 255),    # Orange for Side Text
-    4: (0, 255, 255),    # Yellow for Filler
-}
+CLASS_NAMES = {0: "header", 1: "footer", 2: "main_text", 3: "side_text", 4: "filler"}
+CLASS_COLORS = {0: (255, 255, 0), 1: (255, 0, 255), 2: (0, 255, 0), 3: (0, 165, 255), 4: (0, 255, 255)}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
+Rect = Tuple[int, int, int, int]
+YoloBox = Tuple[int, str, float, float, float, float]
 
 
-def _legacy_extract_layout_boxes(
-    img_path: Path,
-) -> Tuple[int, int, List[Tuple[int, str, float, float, float, float]]]:
+def _odd(value: int) -> int:
+    return max(3, int(value) | 1)
+
+
+def _note_rejection(diagnostics: Optional[MutableMapping[str, int]], reason: str) -> None:
+    if diagnostics is not None:
+        diagnostics["rejected"] += 1
+        diagnostics[f"rejected_{reason}"] += 1
+
+
+def _read_bgr(image_path: Path) -> np.ndarray:
+    """Read grayscale, BGR, or BGRA input as a reliable BGR image."""
+    image = cv2.imread(str(image_path), cv2.IMREAD_UNCHANGED)
+    if image is None:
+        raise ValueError(f"Failed to read image file: {image_path}")
+    if image.ndim == 2:
+        return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    if image.ndim != 3:
+        raise ValueError(f"Unsupported image shape {image.shape} for {image_path}")
+    if image.shape[2] == 4:
+        alpha = image[:, :, 3:4].astype(np.float32) / 255.0
+        return (image[:, :, :3].astype(np.float32) * alpha + 255.0 * (1.0 - alpha)).astype(np.uint8)
+    if image.shape[2] == 3:
+        return image
+    raise ValueError(f"Unsupported channel count for {image_path}")
+
+
+def _normalise_illumination(gray: np.ndarray) -> np.ndarray:
+    """Flatten slow lighting/shadow changes but retain dark handwriting."""
+    h, w = gray.shape
+    kernel = _odd(min(151, max(31, int(min(h, w) * 0.10))))
+    background = np.maximum(cv2.GaussianBlur(gray, (kernel, kernel), 0), 1)
+    return cv2.divide(gray, background, scale=220)
+
+
+def _find_leaf_rectangles(gray: np.ndarray) -> List[Rect]:
+    """Find paper leaves and exclude the dark scanner surround.
+
+    A scan can contain two leaves stacked vertically; handling each leaf
+    independently prevents a page-height text box spanning both of them.
     """
-    Extract layout region bounding boxes for a manuscript image using
-    projection profile gap splitting, morphological component analysis, and tight ink trimming.
-
-    Args:
-        img_path (Path): Path to target manuscript image.
-
-    Returns:
-        Tuple[int, int, List[Tuple[int, str, float, float, float, float]]]:
-            Image height H, width W, and list of detected boxes:
-            (class_id, class_name, x_center, y_center, width, height)
-    """
-    img = cv2.imread(str(img_path))
-    if img is None:
-        raise ValueError(f"Failed to read image file: {img_path}")
-
-    H, W, _ = img.shape
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Adaptive thresholding to separate ink from parchment background
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    thresh = cv2.adaptiveThreshold(
-        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 12
+    h, w = gray.shape
+    border = np.concatenate((gray[0], gray[-1], gray[:, 0], gray[:, -1]))
+    threshold = max(80.0, float(np.median(border)) + 24.0)
+    bright = (gray > threshold).astype(np.uint8) * 255
+    k = max(5, int(min(h, w) * 0.012))
+    bright = cv2.morphologyEx(
+        bright, cv2.MORPH_CLOSE,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (_odd(k), _odd(k))), iterations=2,
     )
-
-    # Fine morphological kernel to group character strokes into line components
-    kw_line = max(10, int(W * 0.012))
-    kh_line = max(3, int(H * 0.003))
-    kernel_line = cv2.getStructuringElement(cv2.MORPH_RECT, (kw_line, kh_line))
-    dilated_line = cv2.dilate(thresh, kernel_line, iterations=2)
-
-    contours_line, _ = cv2.findContours(
-        dilated_line, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    bright = cv2.morphologyEx(
+        bright, cv2.MORPH_OPEN,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (_odd(max(3, k // 2)), _odd(max(3, k // 2)))),
     )
+    count, _, stats, _ = cv2.connectedComponentsWithStats(bright, connectivity=8)
+    leaves: List[Rect] = []
+    for index in range(1, count):
+        x, y, rw, rh, area = (int(value) for value in stats[index])
+        if area >= 0.045 * w * h and rw >= 0.18 * w and rh >= 0.14 * h:
+            leaves.append((x, y, rw, rh))
+    return sorted(leaves, key=lambda rect: (rect[1], rect[0])) or [(0, 0, w, h)]
 
-    line_rects = []
-    for cnt in contours_line:
-        x, y, w, h = cv2.boundingRect(cnt)
-        if w > W * 0.015 and h > H * 0.005 and (w * h) > (W * H * 0.0003):
-            line_rects.append((x, y, w, h))
 
-    if not line_rects:
-        return H, W, []
-
-    # Build ink binary mask
-    ink_mask = np.zeros((H, W), dtype=np.uint8)
-    for x, y, w, h in line_rects:
-        cv2.rectangle(ink_mask, (x, y), (x + w, y + h), 255, -1)
-
-    # Projection profile analysis to split page spreads or multi-column layouts
-    row_sums = np.sum(ink_mask == 255, axis=1)
-    col_sums = np.sum(ink_mask == 255, axis=0)
-
-    # Check horizontal gap near middle (y = 0.35 to 0.65) for vertical page spreads
-    mid_start, mid_end = int(H * 0.35), int(H * 0.65)
-    h_split = None
-    if mid_end > mid_start:
-        min_row_sum = np.min(row_sums[mid_start:mid_end])
-        if min_row_sum < W * 0.04:
-            gap_indices = np.where(row_sums[mid_start:mid_end] == min_row_sum)[0]
-            if len(gap_indices) > 0:
-                h_split = mid_start + gap_indices[len(gap_indices) // 2]
-
-    # Check vertical gap near middle (x = 0.35 to 0.65) for two-column pages
-    mid_col_start, mid_col_end = int(W * 0.35), int(W * 0.65)
-    v_split = None
-    if mid_col_end > mid_col_start:
-        min_col_sum = np.min(col_sums[mid_col_start:mid_col_end])
-        if min_col_sum < H * 0.04:
-            col_gap_indices = np.where(col_sums[mid_col_start:mid_col_end] == min_col_sum)[0]
-            if len(col_gap_indices) > 0:
-                v_split = mid_col_start + col_gap_indices[len(col_gap_indices) // 2]
-
-    # Partition page into layout panels/regions if gaps exist
-    panels = []
-    if h_split is not None:
-        panels.append((0, 0, W, h_split))
-        panels.append((0, h_split, W, H - h_split))
-    elif v_split is not None:
-        panels.append((0, 0, v_split, H))
-        panels.append((v_split, 0, W - v_split, H))
-    else:
-        panels.append((0, 0, W, H))
-
-    raw_boxes = []
-
-    for px, py, pw, ph in panels:
-        panel_rects = [
-            r
-            for r in line_rects
-            if r[0] >= px
-            and (r[0] + r[2]) <= (px + pw)
-            and r[1] >= py
-            and (r[1] + r[3]) <= (py + ph)
-        ]
-        if not panel_rects:
+def _clean_ink_mask(gray: np.ndarray, corrected: np.ndarray, leaf: Rect) -> np.ndarray:
+    """Extract strong ink; reject paper grain, edges, rules, and speckles."""
+    h, w = gray.shape
+    lx, ly, lw, lh = leaf
+    mask = np.zeros((h, w), dtype=np.uint8)
+    # The physical page frame and torn perimeter are frequent false positives
+    # on this collection; a four-percent trim removes them while retaining
+    # genuine marginal writing set inside the parchment.
+    inset_x, inset_y = max(2, int(lw * 0.040)), max(2, int(lh * 0.040))
+    x0, x1, y0, y1 = lx + inset_x, lx + lw - inset_x, ly + inset_y, ly + lh - inset_y
+    if x1 - x0 < 12 or y1 - y0 < 12:
+        return mask
+    roi = corrected[y0:y1, x0:x1]
+    background = float(np.percentile(roi, 70))
+    dark_limit = min(195.0, max(62.0, background - 48.0))
+    dark = (roi < dark_limit).astype(np.uint8) * 255
+    adaptive = cv2.adaptiveThreshold(
+        cv2.GaussianBlur(roi, (5, 5), 0), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV, _odd(min(91, max(31, int(min(roi.shape) * 0.06)))), 9,
+    )
+    ink = cv2.morphologyEx(cv2.bitwise_and(dark, adaptive), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    min_area = max(7, int(0.000006 * lw * lh))
+    cleaned = np.zeros_like(ink)
+    for index in range(1, count):
+        _, _, cw, ch, area = (int(value) for value in stats[index])
+        if area < min_area:
             continue
-
-        headers = []
-        footers = []
-        side_texts = []
-        fillers = []
-        main_line_rects = []
-
-        for rx, ry, rw, rh in panel_rects:
-            r_nx, r_ny, r_nw, r_nh = rx / W, ry / H, rw / W, rh / H
-            r_cx, r_cy = r_nx + r_nw / 2.0, r_ny + r_nh / 2.0
-
-            # Header check: Top margin
-            if (r_ny <= 0.08 or r_cy <= 0.12) and r_nh <= 0.10 and r_nw <= 0.80:
-                headers.append((rx, ry, rw, rh))
-            # Footer check: Bottom margin
-            elif (r_ny + r_nh >= 0.92 or r_cy >= 0.88) and r_nh <= 0.10 and r_nw <= 0.80:
-                footers.append((rx, ry, rw, rh))
-            # Side text check: Left or Right margin
-            elif (r_cx <= 0.18 or r_cx >= 0.82) and 0.12 <= r_cy <= 0.88 and r_nw <= 0.28:
-                side_texts.append((rx, ry, rw, rh))
-            # Filler check: Small isolated decorative or pencil elements
-            elif (r_nw * r_nh) <= 0.003 and (
-                r_cx <= 0.20 or r_cx >= 0.80 or r_cy <= 0.15 or r_cy >= 0.85
-            ):
-                fillers.append((rx, ry, rw, rh))
-            else:
-                main_line_rects.append((rx, ry, rw, rh))
-
-        def fit_tight_box(r_list: List[Tuple[int, int, int, int]]) -> Tuple[int, int, int, int]:
-            if not r_list:
-                return None
-            x1 = min(r[0] for r in r_list)
-            y1 = min(r[1] for r in r_list)
-            x2 = max(r[0] + r[2] for r in r_list)
-            y2 = max(r[1] + r[3] for r in r_list)
-            return (x1, y1, x2 - x1, y2 - y1)
-
-        # 0: header
-        h_box = fit_tight_box(headers)
-        if h_box:
-            mx, my, mw, mh = h_box
-            raw_boxes.append((0, "header", (mx + mw / 2.0) / W, (my + mh / 2.0) / H, mw / W, mh / H))
-
-        # 1: footer
-        f_box = fit_tight_box(footers)
-        if f_box:
-            mx, my, mw, mh = f_box
-            raw_boxes.append((1, "footer", (mx + mw / 2.0) / W, (my + mh / 2.0) / H, mw / W, mh / H))
-
-        # 3: side_text
-        s_box = fit_tight_box(side_texts)
-        if s_box:
-            mx, my, mw, mh = s_box
-            raw_boxes.append((3, "side_text", (mx + mw / 2.0) / W, (my + mh / 2.0) / H, mw / W, mh / H))
-
-        # 4: filler
-        fl_box = fit_tight_box(fillers)
-        if fl_box:
-            mx, my, mw, mh = fl_box
-            raw_boxes.append((4, "filler", (mx + mw / 2.0) / W, (my + mh / 2.0) / H, mw / W, mh / H))
-
-        # 2: main_text (coarse morphological aggregation of body line components)
-        if main_line_rects:
-            p_mask = np.zeros((H, W), dtype=np.uint8)
-            for rx, ry, rw, rh in main_line_rects:
-                cv2.rectangle(p_mask, (rx, ry), (rx + rw, ry + rh), 255, -1)
-
-            kw_m = max(15, int(W * 0.02))
-            kh_m = max(10, int(H * 0.012))
-            kernel_m = cv2.getStructuringElement(cv2.MORPH_RECT, (kw_m, kh_m))
-            p_dilated = cv2.dilate(p_mask, kernel_m, iterations=2)
-
-            p_cnts, _ = cv2.findContours(
-                p_dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-            )
-
-            for cnt in p_cnts:
-                bx, by, bw, bh = cv2.boundingRect(cnt)
-
-                # Trim box to actual tight ink points inside this contour
-                mask_cnt = np.zeros((H, W), dtype=np.uint8)
-                cv2.drawContours(mask_cnt, [cnt], -1, 255, -1)
-                ink_pts = np.where((p_mask > 0) & (mask_cnt > 0))
-
-                if len(ink_pts[0]) > 0:
-                    y_min, y_max = np.min(ink_pts[0]), np.max(ink_pts[0])
-                    x_min, x_max = np.min(ink_pts[1]), np.max(ink_pts[1])
-                    bx, by, bw, bh = (
-                        x_min,
-                        y_min,
-                        x_max - x_min + 1,
-                        y_max - y_min + 1,
-                    )
-
-                bnx, bny, bnw, bnh = bx / W, by / H, bw / W, bh / H
-                area = bnw * bnh
-
-                if area >= 0.008:
-                    bcx, bcy = bnx + bnw / 2.0, bny + bnh / 2.0
-                    raw_boxes.append((2, "main_text", bcx, bcy, bnw, bnh))
-
-    # Clip coordinates strictly within [0.0, 1.0] & apply 80% max area safety rule
-    clipped_boxes = []
-    for cid, cname, xc, yc, bw, bh in raw_boxes:
-        xmin = max(0.0, xc - bw / 2.0)
-        xmax = min(1.0, xc + bw / 2.0)
-        ymin = max(0.0, yc - bh / 2.0)
-        ymax = min(1.0, yc + bh / 2.0)
-
-        real_w = max(0.001, xmax - xmin)
-        real_h = max(0.001, ymax - ymin)
-
-        # STRICT SAFETY RULE: Reject any proposed text-region box whose area is > 80% of image area
-        if real_w * real_h > 0.80:
+        if (cw > 0.30 * lw and ch <= max(3, int(0.006 * lh))) or (ch > 0.35 * lh and cw <= max(3, int(0.006 * lw))):
             continue
-
-        real_xc = xmin + real_w / 2.0
-        real_yc = ymin + real_h / 2.0
-
-        clipped_boxes.append(
-            (
-                cid,
-                cname,
-                round(real_xc, 6),
-                round(real_yc, 6),
-                round(real_w, 6),
-                round(real_h, 6),
-            )
-        )
-
-    return H, W, clipped_boxes
+        cleaned[labels == index] = 255
+    mask[y0:y1, x0:x1] = cleaned
+    return mask
 
 
-# The original morphology-only detector is retained above for reference, but it
-# merged neighbouring folios into page-wide regions.  The production detector
-# first identifies individual parchment leaves, then uses ink profiles and real
-# gutters to localize regions inside each leaf.
-try:  # Package import when invoked with ``python -m``.
-    from .layout_detector import extract_layout_boxes
-except ImportError:  # Direct-script execution from ``src/data``.
-    from layout_detector import extract_layout_boxes
+def _runs(active: np.ndarray) -> List[Tuple[int, int]]:
+    values = np.r_[False, active, False].astype(np.int8)
+    return list(zip(np.flatnonzero(np.diff(values) == 1).astype(int), np.flatnonzero(np.diff(values) == -1).astype(int)))
 
 
-def write_yolo_annotation_file(
-    label_path: Path,
-    boxes: List[Tuple[int, str, float, float, float, float]],
-) -> None:
+def _dense_spans(profile: np.ndarray, min_len: int, merge_gap: int, ratio: float) -> List[Tuple[int, int]]:
+    """Convert a smoothed ink-density profile into gap-separated spans."""
+    if profile.size == 0 or float(profile.max()) <= 0:
+        return []
+    width = _odd(max(5, int(profile.size * 0.014)))
+    smooth = np.convolve(profile.astype(np.float32), np.ones(width, dtype=np.float32) / width, mode="same")
+    spans = _runs(smooth >= max(1.0, float(smooth.max()) * ratio))
+    if not spans:
+        return []
+    merged: List[List[int]] = [[spans[0][0], spans[0][1]]]
+    for start, end in spans[1:]:
+        if start - merged[-1][1] <= merge_gap:
+            merged[-1][1] = end
+        else:
+            merged.append([start, end])
+    return [(start, end) for start, end in merged if end - start >= min_len]
+
+
+def _tight_ink_box(ink: np.ndarray, x0: int, y0: int, x1: int, y1: int) -> Optional[Rect]:
+    """Return a robust, ink-tight rectangle clipped to a proposed region."""
+    h, w = ink.shape
+    x0, x1, y0, y1 = max(0, x0), min(w, x1), max(0, y0), min(h, y1)
+    if x1 - x0 < 5 or y1 - y0 < 5:
+        return None
+    ys, xs = np.where(ink[y0:y1, x0:x1] > 0)
+    if xs.size < 25:
+        return None
+    left, right = np.percentile(xs, (1.0, 99.0))
+    top, bottom = np.percentile(ys, (1.0, 99.0))
+    bx0, by0 = max(0, x0 + int(np.floor(left)) - 1), max(0, y0 + int(np.floor(top)) - 1)
+    bx1, by1 = min(w, x0 + int(np.ceil(right)) + 2), min(h, y0 + int(np.ceil(bottom)) + 2)
+    return (bx0, by0, bx1 - bx0, by1 - by0) if bx1 > bx0 and by1 > by0 else None
+
+
+def _rect_ink_mass(ink: np.ndarray, rect: Rect) -> int:
+    x, y, w, h = rect
+    return int(cv2.countNonZero(ink[y:y + h, x:x + w]))
+
+
+def _horizontal_overlap(a: Rect, b: Rect) -> float:
+    ax, _, aw, _ = a
+    bx, _, bw, _ = b
+    return max(0, min(ax + aw, bx + bw) - max(ax, bx)) / max(1, min(aw, bw))
+
+
+def _merge_body_blocks(blocks: Iterable[Rect], ink: np.ndarray, leaf: Rect) -> List[Rect]:
+    """Merge fragments of one column across short vertical gaps, never gutters."""
+    _, _, _, lh = leaf
+    pending = sorted(blocks, key=lambda rect: (rect[0], rect[1]))
+    changed = True
+    while changed:
+        changed, merged = False, []
+        used = [False] * len(pending)
+        for i, rect in enumerate(pending):
+            if used[i]:
+                continue
+            x, y, w, h = rect
+            used[i] = True
+            for j in range(i + 1, len(pending)):
+                ox, oy, ow, oh = pending[j]
+                if used[j] or _horizontal_overlap((x, y, w, h), pending[j]) < 0.58:
+                    continue
+                gap = max(oy - (y + h), y - (oy + oh), 0)
+                if gap <= max(10, int(0.070 * lh)):
+                    x1, y1, x2, y2 = min(x, ox), min(y, oy), max(x + w, ox + ow), max(y + h, oy + oh)
+                    x, y, w, h, used[j], changed = x1, y1, x2 - x1, y2 - y1, True, True
+            merged.append(_tight_ink_box(ink, x, y, x + w, y + h) or (x, y, w, h))
+        pending = merged
+    return pending
+
+
+def _main_text_blocks(ink: np.ndarray, leaf: Rect) -> List[Rect]:
+    """Use row/column density profiles to extract central text blocks/columns."""
+    lx, ly, lw, lh = leaf
+    roi = ink[ly:ly + lh, lx:lx + lw]
+    rows = _dense_spans(np.count_nonzero(roi, axis=1), max(10, int(0.055 * lh)), max(12, int(0.050 * lh)), 0.055)
+    candidates: List[Rect] = []
+    for ya, yb in rows:
+        if yb - ya < 0.075 * lh:
+            continue
+        cols = _dense_spans(np.count_nonzero(roi[ya:yb], axis=0), max(16, int(0.120 * lw)), max(12, int(0.038 * lw)), 0.075)
+        for xa, xb in cols:
+            if xb - xa < 0.145 * lw:
+                continue
+            candidate = _tight_ink_box(ink, lx + xa, ly + ya, lx + xb, ly + yb)
+            if candidate is None:
+                continue
+            x, _, w, h = candidate
+            centre_x = (x + w / 2.0 - lx) / max(1, lw)
+            if 0.14 <= centre_x <= 0.86 and w >= 0.145 * lw and h >= 0.070 * lh and _rect_ink_mass(ink, candidate) >= max(100, int(0.00020 * lw * lh)):
+                candidates.append(candidate)
+    candidates = _merge_body_blocks(candidates, ink, leaf)
+    if not candidates:
+        return []
+    masses = [_rect_ink_mass(ink, rect) for rect in candidates]
+    largest = max(masses)
+    out: List[Rect] = []
+    for rect, mass in zip(candidates, masses):
+        x, _, w, h = rect
+        centre_x = (x + w / 2.0 - lx) / max(1, lw)
+        density = mass / max(1, w * h)
+        if h >= 0.095 * lh and w >= 0.155 * lw and density >= 0.004 and mass >= 0.14 * largest and 0.16 <= centre_x <= 0.84:
+            out.append(rect)
+    return out
+
+
+def _margin_boxes(ink: np.ndarray, leaf: Rect, main_boxes: List[Rect]) -> List[Rect]:
+    """Find marginal text outside the left/right extent of central body text."""
+    if not main_boxes:
+        return []
+    lx, ly, lw, lh = leaf
+    gap = max(4, int(0.020 * lw))
+    left = min(rect[0] for rect in main_boxes) - gap
+    right = max(rect[0] + rect[2] for rect in main_boxes) + gap
+    main_top = min(rect[1] for rect in main_boxes)
+    main_bottom = max(rect[1] + rect[3] for rect in main_boxes)
+    # Do not mine the ragged physical leaf edge for marginalia.  The remaining
+    # band still includes normal notes/folio marks set inside the margin.
+    regions = [(lx + max(3, int(0.045 * lw)), ly, left, ly + lh), (right, ly, lx + lw - max(3, int(0.045 * lw)), ly + lh)]
+    boxes: List[Rect] = []
+    for x0, y0, x1, y1 in regions:
+        if x1 - x0 < max(10, int(0.018 * lw)):
+            continue
+        margin = ink[y0:y1, x0:x1]
+        expanded = cv2.dilate(margin, cv2.getStructuringElement(cv2.MORPH_RECT, (max(3, int(0.009 * lw)), max(3, int(0.035 * lh)))))
+        count, _, stats, _ = cv2.connectedComponentsWithStats(expanded, connectivity=8)
+        for index in range(1, count):
+            x, y, w, h, _ = (int(value) for value in stats[index])
+            candidate = _tight_ink_box(ink, x0 + x, y0 + y, x0 + x + w, y0 + y + h)
+            if candidate is None:
+                continue
+            bx, by, bw, bh = candidate
+            rel_y = (by + bh / 2.0 - ly) / max(1, lh)
+            mass = _rect_ink_mass(ink, candidate)
+            clear_horizontal_gap = bx + bw <= min(rect[0] for rect in main_boxes) - int(0.025 * lw) or bx >= max(rect[0] + rect[2] for rect in main_boxes) + int(0.025 * lw)
+            alongside_body = by < main_bottom and by + bh > main_top
+            if alongside_body and clear_horizontal_gap and 0.06 <= rel_y <= 0.94 and 0.012 * lw <= bw <= 0.24 * lw and 0.012 * lh <= bh <= 0.75 * lh and mass >= max(45, int(0.00005 * lw * lh)):
+                boxes.append(candidate)
+    return boxes
+
+
+def _header_footer_boxes(ink: np.ndarray, leaf: Rect, main_boxes: List[Rect], image_height: int) -> Tuple[List[Rect], List[Rect]]:
+    """Require separated, evidenced top/bottom ink before assigning 0 or 1."""
+    if not main_boxes:
+        return [], []
+    lx, ly, lw, lh = leaf
+    roi = ink[ly:ly + lh, lx:lx + lw]
+    rows = _dense_spans(np.count_nonzero(roi, axis=1), max(5, int(0.010 * lh)), max(5, int(0.022 * lh)), 0.045)
+    first_main, last_main = min(rect[1] for rect in main_boxes), max(rect[1] + rect[3] for rect in main_boxes)
+    separation = max(9, int(0.032 * lh))
+    headers: List[Rect] = []
+    footers: List[Rect] = []
+    for ya, yb in rows:
+        if yb - ya > 0.150 * lh:
+            continue
+        global_y = (ly + (ya + yb) / 2.0) / max(1, image_height)
+        relative_y = (ya + yb) / (2.0 * max(1, lh))
+        header = global_y < 0.33 and 0.07 <= relative_y < 0.25 and ly + yb + separation < first_main
+        footer = global_y > 0.67 and 0.75 < relative_y <= 0.92 and ly + ya - separation > last_main
+        if not (header or footer):
+            continue
+        cols = _dense_spans(np.count_nonzero(roi[ya:yb], axis=0), max(4, int(0.012 * lw)), max(5, int(0.018 * lw)), 0.050)
+        for xa, xb in cols:
+            candidate = _tight_ink_box(ink, lx + xa, ly + ya, lx + xb, ly + yb)
+            if candidate is None:
+                continue
+            _, _, bw, bh = candidate
+            # A page frame or torn edge can have ink evidence, but is normally
+            # nearly leaf-wide.  It is not a tight header/footer text region.
+            if bw >= 0.010 * lw and bw <= 0.70 * lw and bh >= 0.008 * lh and _rect_ink_mass(ink, candidate) >= max(35, int(0.000035 * lw * lh)):
+                (headers if header else footers).append(candidate)
+    return headers, footers
+
+
+def _blue_or_green_filler(image: np.ndarray, leaf: Rect) -> List[Rect]:
+    """Keep only isolated cool-colour decorations/stamps as high-confidence filler.
+
+    Without OCR, ordinary dark writing cannot safely be called English or pencil,
+    so arbitrary ink/noise is deliberately never promoted to class 4.
     """
-    Write normalized YOLO bounding box label file (.txt).
+    lx, ly, lw, lh = leaf
+    hsv = cv2.cvtColor(image[ly:ly + lh, lx:lx + lw], cv2.COLOR_BGR2HSV)
+    cool = cv2.inRange(hsv, (85, 70, 45), (145, 255, 255))
+    ix, iy = max(2, int(0.012 * lw)), max(2, int(0.012 * lh))
+    cool[:iy], cool[-iy:], cool[:, :ix], cool[:, -ix:] = 0, 0, 0, 0
+    size = _odd(max(3, int(min(lw, lh) * 0.030)))
+    cool = cv2.morphologyEx(cool, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size)))
+    count, _, stats, _ = cv2.connectedComponentsWithStats(cool, connectivity=8)
+    out: List[Rect] = []
+    for index in range(1, count):
+        x, y, w, h, area = (int(value) for value in stats[index])
+        if area >= 0.0015 * lw * lh and w >= 0.025 * lw and h >= 0.025 * lh and w <= 0.30 * lw and h <= 0.35 * lh and area / max(1, w * h) >= 0.12:
+            out.append((lx + x, ly + y, w, h))
+    return out
 
-    Args:
-        label_path (Path): Path to output .txt file.
-        boxes (List[Tuple[int, str, float, float, float, float]]): List of box tuples.
-    """
+
+def _iou(a: YoloBox, b: YoloBox) -> float:
+    ax1, ay1, ax2, ay2 = a[2] - a[4] / 2.0, a[3] - a[5] / 2.0, a[2] + a[4] / 2.0, a[3] + a[5] / 2.0
+    bx1, by1, bx2, by2 = b[2] - b[4] / 2.0, b[3] - b[5] / 2.0, b[2] + b[4] / 2.0, b[3] + b[5] / 2.0
+    inter = max(0.0, min(ax2, bx2) - max(ax1, bx1)) * max(0.0, min(ay2, by2) - max(ay1, by1))
+    union = a[4] * a[5] + b[4] * b[5] - inter
+    return inter / union if union else 0.0
+
+
+def _sanitise_boxes(raw: Iterable[Tuple[int, Rect]], image_width: int, image_height: int, diagnostics: Optional[MutableMapping[str, int]]) -> List[YoloBox]:
+    """Clip, validate, de-duplicate, and de-conflict region candidates."""
+    boxes: List[YoloBox] = []
+    for class_id, (x, y, w, h) in raw:
+        x0, y0, x1, y1 = max(0, x), max(0, y), min(image_width, x + w), min(image_height, y + h)
+        if x1 <= x0 or y1 <= y0:
+            _note_rejection(diagnostics, "invalid")
+            continue
+        bw, bh = (x1 - x0) / image_width, (y1 - y0) / image_height
+        xc, yc = (x0 + x1) / (2.0 * image_width), (y0 + y1) / (2.0 * image_height)
+        if bw < 0.010 or bh < 0.010:
+            _note_rejection(diagnostics, "tiny")
+            continue
+        if bw * bh > 0.62 or bw > 0.92 or bh > 0.94:
+            _note_rejection(diagnostics, "oversize")
+            continue
+        # These global rules explicitly prevent the historical middle-image
+        # header/footer failure, even for scans with stacked leaves.
+        if class_id == 0 and yc >= 0.33:
+            _note_rejection(diagnostics, "header_position")
+            continue
+        if class_id == 1 and yc <= 0.67:
+            _note_rejection(diagnostics, "footer_position")
+            continue
+        boxes.append((class_id, CLASS_NAMES[class_id], xc, yc, bw, bh))
+    unique: List[YoloBox] = []
+    for box in sorted(boxes, key=lambda value: value[4] * value[5], reverse=True):
+        if any(box[0] == kept[0] and _iou(box, kept) > 0.68 for kept in unique):
+            _note_rejection(diagnostics, "duplicate")
+            continue
+        unique.append(box)
+    priority = {0: 0, 1: 0, 4: 1, 3: 2, 2: 3}
+    kept: List[YoloBox] = []
+    for box in sorted(unique, key=lambda value: (priority[value[0]], -(value[4] * value[5]))):
+        if any(box[0] != previous[0] and _iou(box, previous) > 0.30 for previous in kept):
+            _note_rejection(diagnostics, "cross_class_overlap")
+            continue
+        kept.append(box)
+    return sorted(kept, key=lambda value: (value[0], value[3], value[2]))
+
+
+def extract_layout_boxes(img_path: Path, diagnostics: Optional[MutableMapping[str, int]] = None) -> Tuple[int, int, List[YoloBox]]:
+    """Extract conservative manuscript-layout pseudo-labels from one image."""
+    image = _read_bgr(img_path)
+    image_height, image_width = image.shape[:2]
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    corrected = _normalise_illumination(gray)
+    raw: List[Tuple[int, Rect]] = []
+    for leaf in _find_leaf_rectangles(gray):
+        ink = _clean_ink_mask(gray, corrected, leaf)
+        if cv2.countNonZero(ink) < max(100, int(0.0004 * leaf[2] * leaf[3])):
+            continue
+        main = _main_text_blocks(ink, leaf)
+        headers, footers = _header_footer_boxes(ink, leaf, main, image_height)
+        raw.extend((0, rect) for rect in headers)
+        raw.extend((1, rect) for rect in footers)
+        raw.extend((2, rect) for rect in main)
+        raw.extend((3, rect) for rect in _margin_boxes(ink, leaf, main))
+        raw.extend((4, rect) for rect in _blue_or_green_filler(image, leaf))
+    return image_height, image_width, _sanitise_boxes(raw, image_width, image_height, diagnostics)
+
+
+def write_yolo_annotation_file(label_path: Path, boxes: List[YoloBox]) -> None:
+    """Write one normalized YOLO label file, including intentionally empty files."""
     label_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(label_path, mode="w", encoding="utf-8") as f:
-        for cid, _, xc, yc, bw, bh in boxes:
-            f.write(f"{cid} {xc:.6f} {yc:.6f} {bw:.6f} {bh:.6f}\n")
+    with label_path.open("w", encoding="utf-8") as output:
+        for class_id, _, xc, yc, bw, bh in boxes:
+            output.write(f"{class_id} {xc:.6f} {yc:.6f} {bw:.6f} {bh:.6f}\n")
 
 
-def generate_preview_image(
-    img_path: Path,
-    boxes: List[Tuple[int, str, float, float, float, float]],
-    preview_path: Path,
-) -> None:
-    """
-    Generate an annotated visual preview image with color-coded bounding boxes and labels.
-
-    Args:
-        img_path (Path): Original image path.
-        boxes (List[Tuple[int, str, float, float, float, float]]): Detected boxes.
-        preview_path (Path): Output preview image path.
-    """
-    img = cv2.imread(str(img_path))
-    if img is None:
-        return
-
-    H, W, _ = img.shape
+def generate_preview_image(img_path: Path, boxes: List[YoloBox], preview_path: Path) -> None:
+    """Render optional colored previews for inspection."""
+    image = _read_bgr(img_path)
+    h, w = image.shape[:2]
     preview_path.parent.mkdir(parents=True, exist_ok=True)
-
-    for cid, cname, xc, yc, bw, bh in boxes:
-        xmin = int((xc - bw / 2.0) * W)
-        ymin = int((yc - bh / 2.0) * H)
-        xmax = int((xc + bw / 2.0) * W)
-        ymax = int((yc + bh / 2.0) * H)
-
-        color = CLASS_COLORS.get(cid, (0, 255, 0))
-
-        # Draw bounding box
-        cv2.rectangle(img, (xmin, ymin), (xmax, ymax), color, 3)
-
-        # Format label text
-        label_text = f"{cid}:{cname}"
-        (tw, th), baseline = cv2.getTextSize(
-            label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-        )
-
-        label_ymin = max(ymin, th + 5)
-        cv2.rectangle(
-            img,
-            (xmin, label_ymin - th - 5),
-            (xmin + tw + 6, label_ymin + baseline),
-            color,
-            -1,
-        )
-        cv2.putText(
-            img,
-            label_text,
-            (xmin + 3, label_ymin - 2),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (0, 0, 0),
-            2,
-            cv2.LINE_AA,
-        )
-
-    cv2.imwrite(str(preview_path), img)
+    for class_id, name, xc, yc, bw, bh in boxes:
+        x0, y0, x1, y1 = int((xc - bw / 2) * w), int((yc - bh / 2) * h), int((xc + bw / 2) * w), int((yc + bh / 2) * h)
+        color = CLASS_COLORS[class_id]
+        cv2.rectangle(image, (x0, y0), (x1, y1), color, 3)
+        label = f"{class_id}:{name}"
+        (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+        text_y = max(y0, th + 5)
+        cv2.rectangle(image, (x0, text_y - th - 5), (x0 + tw + 6, text_y + baseline), color, -1)
+        cv2.putText(image, label, (x0 + 3, text_y - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+    cv2.imwrite(str(preview_path), image)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate initial YOLO object detection annotations for manuscript layout regions."
-    )
-    parser.add_argument(
-        "--input",
-        type=str,
-        default="data/dataset/images/train",
-        help="Input directory containing training manuscript images.",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="data/dataset/labels/train",
-        help="Output directory for YOLO label files (.txt).",
-    )
-    parser.add_argument(
-        "--preview-dir",
-        type=str,
-        default="data/dataset/auto_annotated_previews",
-        help="Directory to save annotated preview images.",
-    )
-    parser.add_argument(
-        "--max-previews",
-        type=int,
-        default=0,
-        help="Maximum number of preview images to render (0 for all).",
-    )
-
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate conservative YOLO pseudo-labels for manuscript layout regions.")
+    parser.add_argument("--input", type=str, default="data/dataset/images/train", help="Input image directory.")
+    parser.add_argument("--output", type=str, default="data/dataset/labels/train", help="Output YOLO-label directory.")
+    parser.add_argument("--preview-dir", type=str, default="data/dataset/auto_annotated_previews", help="Directory for optional previews.")
+    parser.add_argument("--max-previews", type=int, default=0, help="Preview count (0 = all, -1 = none).")
     args = parser.parse_args()
-
-    input_dir = Path(args.input)
-    output_dir = Path(args.output)
-    preview_dir = Path(args.preview_dir)
-
-    if not input_dir.exists() or not input_dir.is_dir():
+    input_dir, output_dir, preview_dir = Path(args.input), Path(args.output), Path(args.preview_dir)
+    if not input_dir.is_dir():
         print(f"[ERROR] Input directory not found: {input_dir}")
         sys.exit(1)
-
-    image_paths = sorted(
-        [
-            p
-            for p in input_dir.iterdir()
-            if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
-        ]
-    )
-
-    total_images = len(image_paths)
-    images_with_detections = 0
-    total_boxes = 0
-    rejected_over_80 = 0
-    class_counts = Counter()
-    errors = []
-
+    paths = sorted(path for path in input_dir.iterdir() if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS)
+    diagnostics: Counter[str] = Counter()
+    counts: Counter[int] = Counter()
+    images_per_class: Counter[int] = Counter()
+    errors: List[str] = []
+    empty = 0
     print("=" * 65)
-    print(" Manuscript Layout Auto-Annotation Execution (Improved Layout Pipeline)")
+    print(" Manuscript Layout Auto-Annotation")
     print("=" * 65)
-    print(f" Input Images Directory  : {input_dir.resolve()}")
-    print(f" Output Labels Directory  : {output_dir.resolve()}")
-    print(f" Preview Images Directory : {preview_dir.resolve()}")
-    print(f" Total Images Found       : {total_images}")
+    print(f"Input images : {input_dir.resolve()}")
+    print(f"Output labels: {output_dir.resolve()}")
+    print(f"Images found : {len(paths)}")
     print("-" * 65)
-
-    for idx, img_path in enumerate(image_paths):
+    for index, path in enumerate(paths):
         try:
-            H, W, boxes = extract_layout_boxes(img_path)
-
-            if boxes:
-                images_with_detections += 1
-                total_boxes += len(boxes)
-                for b in boxes:
-                    class_counts[b[0]] += 1
-                    if (b[4] * b[5]) > 0.80:
-                        rejected_over_80 += 1
-
-                label_path = output_dir / f"{img_path.stem}.txt"
-                write_yolo_annotation_file(label_path, boxes)
-
-            else:
-                label_path = output_dir / f"{img_path.stem}.txt"
-                label_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(label_path, mode="w", encoding="utf-8") as f:
-                    pass
-
-            # Render preview image for all images
-            if args.max_previews == 0 or idx < args.max_previews:
-                preview_path = preview_dir / f"{img_path.stem}_preview.jpg"
-                generate_preview_image(img_path, boxes, preview_path)
-
-        except Exception as e:
-            errors.append(f"{img_path.name}: {str(e)}")
-
-    print(f" Processed Images            : {total_images}")
-    print(f" Images with Detections      : {images_with_detections}")
-    print(f" Total Boxes Generated       : {total_boxes}")
-    print(f" Boxes Rejected (Area > 80%) : {rejected_over_80}")
-    print(f" Errors Encountered          : {len(errors)}")
-    print("-" * 65)
-    print(" Boxes per Class Breakdown:")
-    for cid in range(5):
-        cname = CLASS_NAMES[cid]
-        cnum = class_counts[cid]
-        print(f"   Class {cid} ({cname:9}): {cnum:4} boxes")
-    print("=" * 65)
-
+            _, _, boxes = extract_layout_boxes(path, diagnostics)
+            write_yolo_annotation_file(output_dir / f"{path.stem}.txt", boxes)
+            if not boxes:
+                empty += 1
+            for class_id in {box[0] for box in boxes}:
+                images_per_class[class_id] += 1
+            for box in boxes:
+                counts[box[0]] += 1
+            if args.max_previews == 0 or (args.max_previews > 0 and index < args.max_previews):
+                generate_preview_image(path, boxes, preview_dir / f"{path.stem}_preview.jpg")
+        except Exception as error:
+            errors.append(f"{path.name}: {error}")
+    print(f"Images processed: {len(paths)}")
+    print("\nGenerated instances:")
+    for class_id in range(5):
+        print(f"{CLASS_NAMES[class_id]}: {counts[class_id]}")
+    print("\nImages with each class:")
+    for class_id in range(5):
+        print(f"{CLASS_NAMES[class_id]}: {images_per_class[class_id]}")
+    print(f"\nRejected candidate boxes: {diagnostics['rejected']}")
+    for reason in ("tiny", "oversize", "invalid", "duplicate", "cross_class_overlap", "header_position", "footer_position"):
+        if diagnostics[f"rejected_{reason}"]:
+            print(f"  {reason}: {diagnostics[f'rejected_{reason}']}")
+    print(f"Invalid/empty annotations: {empty}")
+    print(f"Read/processing errors: {len(errors)}")
+    print(f"Label files regenerated: {len(paths) - len(errors)}")
     if errors:
-        print("\n[WARNING] Errors during processing:")
-        for err in errors:
-            print(f"  - {err}")
-
-    print(f"\n[SUCCESS] Auto-annotation process complete.")
-    print(f"[INFO] YOLO label files written to: {output_dir.resolve()}")
-    print(f"[INFO] Annotated previews saved to: {preview_dir.resolve()}\n")
+        print("\n[WARNING] Files not regenerated due to errors:")
+        for error in errors:
+            print(f"  - {error}")
+    print("=" * 65)
 
 
 if __name__ == "__main__":

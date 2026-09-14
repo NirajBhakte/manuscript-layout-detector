@@ -16,8 +16,8 @@ from pathlib import Path
 import torch
 from ultralytics import YOLO
 
-PRETRAINED_MODEL = "yolo11n.pt"
-EPOCHS = 40
+PRETRAINED_MODEL = "models/best.pt"
+EPOCHS = 30
 IMGSZ = 640
 
 
@@ -65,12 +65,13 @@ def main() -> None:
         batch=batch,
         workers=workers,
         project=str(runs_dir),
-        name="train",
+        name="train_final",
         exist_ok=True,
         verbose=True,
+        rect = True
     )
 
-    best_weights_path = runs_dir / "train" / "weights" / "best.pt"
+    best_weights_path = runs_dir / "train_final" / "weights" / "best.pt"
     models_dir = project_dir / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
     target_best_pt = models_dir / "best.pt"
